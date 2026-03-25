@@ -1,0 +1,618 @@
+{
+  "info": {
+    "name": "VidVore API",
+    "_postman_id": "vidvore-api-collection",
+    "description": "Complete API collection for VidVore - A YouTube-like backend platform. Base URL: http://localhost:3000/api/v1\n\n**HOW TO USE:**\n1. Register a user first\n2. Login to get accessToken\n3. Set accessToken in the Collection Variables\n4. All protected routes will work automatically via Bearer Token",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api/v1" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "videoId", "value": "" },
+    { "key": "tweetId", "value": "" },
+    { "key": "commentId", "value": "" },
+    { "key": "playlistId", "value": "" },
+    { "key": "channelId", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "🏥 Healthcheck",
+      "item": [
+        {
+          "name": "Healthcheck",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/healthcheck",
+            "description": "Check if the server is running"
+          }
+        }
+      ]
+    },
+    {
+      "name": "👤 Users",
+      "item": [
+        {
+          "name": "Register User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const res = pm.response.json();",
+                  "  if (res.data && res.data._id) {",
+                  "    pm.collectionVariables.set('userId', res.data._id);",
+                  "    console.log('userId set:', res.data._id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/users/register",
+            "description": "Register a new user. Requires avatar image (mandatory) and coverImage (optional).",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "username", "value": "shivansh123", "type": "text" },
+                { "key": "email", "value": "shivansh@test.com", "type": "text" },
+                { "key": "fullName", "value": "Shivansh Rajput", "type": "text" },
+                { "key": "password", "value": "Password@123", "type": "text" },
+                { "key": "avatar", "type": "file", "src": "" },
+                { "key": "coverImage", "type": "file", "src": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const res = pm.response.json();",
+                  "  if (res.data) {",
+                  "    pm.collectionVariables.set('accessToken', res.data.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', res.data.refreshToken);",
+                  "    if (res.data.user && res.data.user._id) {",
+                  "      pm.collectionVariables.set('userId', res.data.user._id);",
+                  "    }",
+                  "    console.log('Login successful! Token saved.');",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/users/login",
+            "description": "Login with username/email and password. accessToken is automatically saved.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"shivansh123\",\n  \"password\": \"Password@123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/users/get-current-user",
+            "description": "Get logged in user's profile (requires login)"
+          }
+        },
+        {
+          "name": "Update Account Details",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "url": "{{baseUrl}}/users/update-user-details",
+            "description": "Update fullName and email",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Shivansh Rajput Updated\",\n  \"email\": \"shivansh_new@test.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "url": "{{baseUrl}}/users/change-password",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oldPassword\": \"Password@123\",\n  \"newPassword\": \"NewPassword@456\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Avatar",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "PATCH",
+            "url": "{{baseUrl}}/users/update-avatar",
+            "description": "Update profile avatar image",
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "avatar", "type": "file", "src": "" }]
+            }
+          }
+        },
+        {
+          "name": "Get Channel Profile",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/users/c/shivansh123",
+            "description": "Get a channel profile by username. Replace 'shivansh123' with any username."
+          }
+        },
+        {
+          "name": "Get Watch History",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/users/history",
+            "description": "Get logged-in user's video watch history"
+          }
+        },
+        {
+          "name": "Refresh Access Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const res = pm.response.json();",
+                  "  if (res.data && res.data.accessToken) {",
+                  "    pm.collectionVariables.set('accessToken', res.data.accessToken);",
+                  "    console.log('New accessToken saved!');",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/users/refresh-token",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Logout User",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "url": "{{baseUrl}}/users/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🎬 Videos",
+      "item": [
+        {
+          "name": "Get All Videos",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/videos?page=1&limit=10&sortBy=createdAt&sortType=desc",
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "sortBy", "value": "createdAt" },
+                { "key": "sortType", "value": "desc" },
+                { "key": "query", "value": "", "disabled": true },
+                { "key": "userId", "value": "{{userId}}", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Upload Video",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const res = pm.response.json();",
+                  "  if (res.data && res.data._id) {",
+                  "    pm.collectionVariables.set('videoId', res.data._id);",
+                  "    console.log('videoId saved:', res.data._id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "url": "{{baseUrl}}/videos",
+            "description": "Upload a new video with thumbnail. Requires videoFile and thumbnail.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "title", "value": "My First Video", "type": "text" },
+                { "key": "description", "value": "This is my first uploaded video!", "type": "text" },
+                { "key": "videoFile", "type": "file", "src": "" },
+                { "key": "thumbnail", "type": "file", "src": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Video By ID",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/videos/{{videoId}}"
+          }
+        },
+        {
+          "name": "Update Video",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "PATCH",
+            "url": "{{baseUrl}}/videos/{{videoId}}",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "title", "value": "Updated Video Title", "type": "text" },
+                { "key": "description", "value": "Updated description", "type": "text" },
+                { "key": "thumbnail", "type": "file", "src": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Toggle Publish Status",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "PATCH",
+            "url": "{{baseUrl}}/videos/toggle/publish/{{videoId}}",
+            "description": "Toggle video between published/unpublished"
+          }
+        },
+        {
+          "name": "Delete Video",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "url": "{{baseUrl}}/videos/{{videoId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🐦 Tweets",
+      "item": [
+        {
+          "name": "Create Tweet",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const res = pm.response.json();",
+                  "  if (res.data && res.data._id) {",
+                  "    pm.collectionVariables.set('tweetId', res.data._id);",
+                  "    console.log('tweetId saved:', res.data._id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "url": "{{baseUrl}}/tweets",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"This is my first tweet on VidVore! 🚀\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get User Tweets",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/tweets/user/{{userId}}"
+          }
+        },
+        {
+          "name": "Update Tweet",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "PATCH",
+            "url": "{{baseUrl}}/tweets/{{tweetId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Updated tweet content! ✨\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Tweet",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "url": "{{baseUrl}}/tweets/{{tweetId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "💬 Comments",
+      "item": [
+        {
+          "name": "Get Video Comments",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/comments/{{videoId}}"
+          }
+        },
+        {
+          "name": "Add Comment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const res = pm.response.json();",
+                  "  if (res.data && res.data._id) {",
+                  "    pm.collectionVariables.set('commentId', res.data._id);",
+                  "    console.log('commentId saved:', res.data._id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "url": "{{baseUrl}}/comments/{{videoId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Great video! Really helpful 🔥\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Comment",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "PATCH",
+            "url": "{{baseUrl}}/comments/c/{{commentId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Updated comment content!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Comment",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "url": "{{baseUrl}}/comments/c/{{commentId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "❤️ Likes",
+      "item": [
+        {
+          "name": "Toggle Video Like",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "url": "{{baseUrl}}/likes/toggle/v/{{videoId}}",
+            "description": "Like or unlike a video (toggles)"
+          }
+        },
+        {
+          "name": "Toggle Comment Like",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "url": "{{baseUrl}}/likes/toggle/c/{{commentId}}"
+          }
+        },
+        {
+          "name": "Toggle Tweet Like",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "url": "{{baseUrl}}/likes/toggle/t/{{tweetId}}"
+          }
+        },
+        {
+          "name": "Get Liked Videos",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/likes/videos"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔔 Subscriptions",
+      "item": [
+        {
+          "name": "Toggle Subscription",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "url": "{{baseUrl}}/subscriptions/c/{{channelId}}",
+            "description": "Subscribe or unsubscribe from a channel"
+          }
+        },
+        {
+          "name": "Get Channel Subscribers",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/subscriptions/u/{{userId}}",
+            "description": "Get all subscribers of a channel"
+          }
+        },
+        {
+          "name": "Get Subscribed Channels",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/subscriptions/c/{{channelId}}",
+            "description": "Get all channels a user has subscribed to"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Playlists",
+      "item": [
+        {
+          "name": "Create Playlist",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const res = pm.response.json();",
+                  "  if (res.data && res.data._id) {",
+                  "    pm.collectionVariables.set('playlistId', res.data._id);",
+                  "    console.log('playlistId saved:', res.data._id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "url": "{{baseUrl}}/playlist",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My Favourites\",\n  \"description\": \"My favourite videos collection\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Playlist By ID",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/playlist/{{playlistId}}"
+          }
+        },
+        {
+          "name": "Get User Playlists",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/playlist/user/{{userId}}"
+          }
+        },
+        {
+          "name": "Add Video to Playlist",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "PATCH",
+            "url": "{{baseUrl}}/playlist/add/{{videoId}}/{{playlistId}}"
+          }
+        },
+        {
+          "name": "Remove Video from Playlist",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "PATCH",
+            "url": "{{baseUrl}}/playlist/remove/{{videoId}}/{{playlistId}}"
+          }
+        },
+        {
+          "name": "Update Playlist",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "PATCH",
+            "url": "{{baseUrl}}/playlist/{{playlistId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Playlist Name\",\n  \"description\": \"Updated description\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Playlist",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "url": "{{baseUrl}}/playlist/{{playlistId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Dashboard",
+      "item": [
+        {
+          "name": "Get Channel Stats",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/dashboard/stats",
+            "description": "Get total views, subscribers, videos, likes for your channel"
+          }
+        },
+        {
+          "name": "Get Channel Videos",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/dashboard/videos",
+            "description": "Get all videos uploaded by the logged-in user"
+          }
+        }
+      ]
+    }
+  ]
+}

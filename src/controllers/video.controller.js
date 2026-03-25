@@ -33,24 +33,29 @@ const getAllVideos = asyncHandler(async (req, res) => {
 
    let pipeline =[{
     $match:{
-        $and:{
+        $and:[
              // 2.1 match the videos based on title and description
-            $or:[
-                {
-                    title:{
-                        $regex:query,
-                        $options:"i"
+            {
+                $or:[
+                    {
+                        title:{
+                            $regex:query,
+                            $options:"i"
+                        }
                     },
-                    description:{
-                         $regex:query,
-                        $options:"i"
+                    {
+                        description:{
+                            $regex:query,
+                            $options:"i"
+                        }
                     }
-                },
-                // 2.2 match the videos based on userId=Owner
-                ...(userId?[{owner:mongoose.Types.ObjectId(userId)}]:"")
-            ]
-        }
+                ]
+            },
+            // 2.2 match the videos based on userId=Owner
+            ...(userId?[{owner:new mongoose.Types.ObjectId(userId)}]:[])
+        ]
     }},
+    { $match: { isPublished: true } },
     {
          // from user it match the _id of user with Owner field of video and saved as Owner
         $lookup:{
@@ -69,15 +74,15 @@ const getAllVideos = asyncHandler(async (req, res) => {
         }
     },
     {
-        $addFields:{// 4. addFields just add the Owner field to the video documen
+        $addFields:{// 4. addFields just add the Owner field to the video document
             owner:{
-                $first:$owner  // $first: is used to get the first element of Owner array
+                $first:"$owner"  // $first: is used to get the first element of Owner array
             }
         }
     },
     {
         $sort:{
-            [sortBy]:sortType  // sort the videos based on sortBy and sortType
+            [sortBy]: sortType === "desc" ? -1 : 1  // convert string to number for MongoDB sort
         }
     }]
 
