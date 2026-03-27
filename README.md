@@ -1,103 +1,97 @@
-# VidVore Backend API
+# VidVore Backend Infrastructure
 
-VidVore is a high-performance backend architecture designed for a scalable video-sharing platform. It implements critical system components including JWT-based identity management, Redis-based rate limiting, and automated cloud-media synchronization.
+[![Node.js CI](https://github.com/Flamekaiser17/VidCore-/actions/workflows/node.js.yml/badge.svg)](https://github.com/Flamekaiser17/VidCore-/actions/workflows/node.js.yml)
 
-![VidVore Interface](C:\Users\ADMIN\.gemini\antigravity\brain\add7fcef-11e3-4c30-a2f8-44b4e574b4e6\vidvore_ui_mockup_1774640227633.png)
+VidVore is a high-availability backend system designed for large-scale video-centric ecosystems. It implements enterprise-grade components including multi-token authentication, Redis-based transaction limiting, and asynchronous cloud media synchronization.
 
-## Overview
-
-The VidVore backend serves as a robust foundation for building large-scale media applications. It addresses key technical requirements such as secure user authentication, optimized data persistence with Mongoose, and sub-millisecond data retrieval using Redis.
+![VidVore Application Interface](./docs/assets/vidvore_ui.png)
 
 ---
 
-## Technical Stack
+## Technical Architecture Overview
 
-| Category | Technology | Implementation Details |
-| :--- | :--- | :--- |
-| **Runtime** | Node.js | Asynchronous, event-driven module system (ESM) |
-| **Web Server** | Express.js | Modular routing and centralized middleware management |
-| **Primary Database**| MongoDB | Schema validation and aggregation pipelines via Mongoose |
-| **Caching/Limiting**| Redis | Session-level caching and global rate limiting |
-| **Media Engine** | Cloudinary | Auto-transformation and CDN-based delivery |
-| **Containerization**| Docker | Standardized deployment through Docker Compose |
+The VidVore platform is engineered for scalability and maintains a clear separation between data persistence, business logic, and external service integrations.
 
----
+### System Workflow
+![Project Architecture](./docs/assets/architecture.png)
 
-## System Architecture
-
-The project follows a decoupling strategy, separating state persistence from business operations.
-
-![Architecture Diagram](C:\Users\ADMIN\.gemini\antigravity\brain\add7fcef-11e3-4c30-a2f8-44b4e574b4e6\vidvore_architecture_diagram_1774640248118.png)
-
-### Request Lifecycle
-
+#### Decoupled Service Design
 ```mermaid
 graph TD
-    A[Public API Request] --> B[Express Router]
-    B --> C[Authentication Middleware]
-    C --> D[Rate Limiter - Redis]
-    D --> E[Controller Logic]
-    E --> F[MongoDB Interaction]
-    E --> G[Cloudinary Integration]
-    E --> H[Redis Caching Engine]
-    F --> I[Formatted API Response]
+    A[Client Traffic] --> B[Standardized Express Router]
+    B --> C[Authentication & Identity Guard]
+    C --> D[Redis Rate Limiting Layer]
+    D --> E[Business Logic Controller]
+    E --> F[MongoDB Persistent Storage]
+    E --> G[Cloudinary Media CDN]
+    E --> H[Redis Caching Kernel]
+    F --> I[Structured API Response]
 ```
 
 ---
 
-## Core Engineering Features
+## Engineering Standards
 
-### Authentication and Identity Management
-- Implements a Dual-Token (Access/Refresh) strategy for enhanced security.
-- Cryptographic password hashing using standard Bcrypt algorithms.
-- Middleware-driven authorization for granular route protection.
-
-### Performance and Security
-- **Global Rate Limiting:** Enforced via Redis to prevent brute-force attacks.
-- **Data Caching:** Frequently accessed metadata is cached in Redis to reduce database load.
-- **Centralized Error Handling:** Standardized error response objects for API consistency.
-
-### Media Workflow
-- Automated cleanup of local disk storage post-Cloudinary synchronization.
-- Support for multi-part form data processing via Multer.
-- Real-time video/image processing and optimization during ingestion.
+| Dimension | Implementation Strategy |
+| :--- | :--- |
+| **Authentication** | Dual-Token (Access/Refresh) strategy with Bcrypt-hashing and automated rotation. |
+| **Storage** | Multer-based localized ingestion with automated Cloudinary mirroring and async cleanup. |
+| **Performance** | Sub-millisecond data retrieval using Redis and MongoDB aggregation pipelines. |
+| **Security** | Standardized middleware for Rate Limiting, Cross-Origin Resource Sharing (CORS), and standardized error handling. |
+| **Development** | ESM-based Node.js runtime with Prettier-driven codebase consistency. |
 
 ---
 
-## API Endpoints Overview
+## Core API Infrastructure
 
-| Module | Base Path | Key Functionality |
-| :--- | :--- | :--- |
-| **Identity** | `/api/v1/users` | Registration, Authenticated Profile, Token Rotation |
-| **Media** | `/api/v1/videos` | Video CRUD, Search Pipelines, Metadata updates |
-| **Interactions** | `/api/v1/likes` | Optimized interaction toggling |
-| **Analytics** | `/api/v1/dashboard` | Aggregated user performance metrics |
-| **Documentation** | `/api-docs` | Interactive Swagger/OpenAPI specifications |
+### Identity and Profile Management
+- **Registration Hub:** Orchestrates user registration with concurrent media upload processing.
+- **Session Security:** Implements secure logout protocols and server-side session invalidation.
+- **Dynamic Profiles:** Supports real-time updates for avatars and cover images with Cloudinary syncing.
+
+### Content and Interaction Engine
+- **Video Orchestration:** Supports creation, retrieval, updates, and deletion (CRUD) with automated metadata extraction.
+- **Engagement Analytics:** Optimized interaction tracking for likes, subscriptions, and comment threading.
+- **System Dashboard:** Provides aggregated channel performance statistics and historical data visualization.
 
 ---
 
-## Deployment and Local Setup
+## Deployment and Setup
 
-### Prerequisites
-- Node.js (Version 18.0 or higher)
-- Docker Desktop
-- MongoDB Atlas or Local Instance
-- Redis Instance
+### External Dependencies
+- **Runtime:** Node.js (v18.0+)
+- **Storage:** MongoDB & Cloudinary Account
+- **Caching:** Redis Instance
+- **Environment:** Docker Desktop
 
-### Local Execution (Docker)
-Ensure Docker is running and execute:
+### Standardized Execution (Containerized)
+The entire infrastructure can be instantiated using Docker Compose to ensure environment parity:
 ```bash
 docker-compose up --build chalwao
 ```
 
 ### Manual Configuration
-1. Initialize environment: `cp .env.example .env`
-2. Configure credentials for MongoDB, Redis, and Cloudinary.
+1. Initialize variables: `cp .env.example .env`
+2. Update `.env` with validated repository credentials.
 3. Install dependencies: `npm install`
-4. Run development environment: `npm run dev`
+4. Execute development server: `npm run dev`
+
+---
+
+## Quality Assurance
+
+VidVore includes an automated CI/CD pipeline via GitHub Actions. Every commit undergoes:
+1. **Linter validation:** Ensuring adherence to formatting standards.
+2. **Connectivity validation:** Verifying integration points between Node.js, MongoDB, and Redis.
+
+### Run Local Tests
+```bash
+npm test
+```
 
 ---
 
 ## Author
 **Shivansh Rajput**
 Full Stack Systems Engineer
+Specializing in Distributed Systems & Scalable Architectures
