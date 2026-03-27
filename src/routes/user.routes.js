@@ -3,9 +3,12 @@ import {logoutUser,loginUser,registerUser,refreshingAccessToken,changeCurrentPas
 import {upload} from "../middlewares/multer.middlewares.js"
 import {verifyJWT} from "../middlewares/auth.middlewares.js"
 
+import { authLimiter } from "../middlewares/rateLimiter.js"
+
 const router = Router()
 
 router.route("/register").post(
+    authLimiter,
     upload.fields([
         {
             name:"avatar",
@@ -18,7 +21,7 @@ router.route("/register").post(
     ]),
     registerUser)
 
-router.route("/login").post(loginUser)
+router.route("/login").post(authLimiter, loginUser)
 
 //secure routes
 

@@ -26,14 +26,17 @@ This project is created to simplify backend service development while ensuring:
 - Centralized error handling for consistent API responses
 - MongoDB + Mongoose integration for data persistence
 - Modular and scalable code structure
+- **Rate Limiting** to prevent brute-force attacks
+- **Redis Caching** for optimized data access
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v14+)
+- Node.js (v18+)
 - MongoDB instance (local or cloud)
 - Cloudinary account for media management
+- Redis (optional for caching)
 
 ### Installation
 
@@ -41,3 +44,17 @@ This project is created to simplify backend service development while ensuring:
 git clone https://github.com/yourusername/js-backend.git
 cd js-backend
 npm install
+```
+
+## Running with Docker
+Ensure Docker Desktop is installed.
+
+```bash
+docker-compose up --build
+```
+
+This starts:
+- **VidVore App**: http://localhost:3000
+- **MongoDB**: mongodb:27017
+- **Redis**: redis:6379
+- **Swagger Documentation**: http://localhost:3000/api-docs

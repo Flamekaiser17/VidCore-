@@ -5,6 +5,7 @@ import {apiError} from "../utils/apiError.js"
 import {apiResponse} from "../utils/apiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
 import {uploadOnCloudinary,deleteFromCloudinary} from "../utils/cloudinary.js"
+import { redis } from "../utils/redis.js"
 import { pipeline } from "stream"
 import { read } from "fs"
 
@@ -191,31 +192,48 @@ const publishAVideo = asyncHandler(async (req, res) => {
 const getVideoById = asyncHandler(async (req, res) => {
     try {
         const { videoId } = req.params
-        //TODO: get video by id
+        
         if (!isValidObjectId(videoId)) {
-            throw new apiError(400,"Enter a valid videoId")
+            throw new apiError(400, "Enter a valid videoId")
         }
+
+        const cacheKey = `video:${videoId}`;
+
+        // Step 1: Check Redis cache
+        const cachedVideo = await redis.get(cacheKey);
+        
+        if (cachedVideo) {
+            console.log("⚡ Serving from Cache");
+            return res.status(200).json(
+                new apiResponse(200, JSON.parse(cachedVideo), "video fetched successfully (from cache)")
+            );
+        }
+
+        // Step 2: If cache miss, fetch from MongoDB
+        console.log("🐢 Cache Miss - Fetching from DB");
         const video = await Video.findById(videoId)
 
-        if(!video){
-            throw new apiError(200,"failed to fetch video details")
+        if (!video) {
+            throw new apiError(404, "failed to fetch video details")
         }
 
+        // Step 3: Store in Redis for 5 minutes (300 seconds)
+        await redis.set(cacheKey, JSON.stringify(video), "EX", 300);
+
         return res.status(200)
-        .json(
-            new apiResponse(200,
-                video,
-                "video fetched successfully"
+            .json(
+                new apiResponse(200,
+                    video,
+                    "video fetched successfully"
+                )
             )
-        )
 
     } catch (error) {
         res.status(501)
-        .json(
-            new apiResponse(501,{},"video not found")
-        )
+            .json(
+                new apiResponse(501, {}, "video not found")
+            )
     }
-
 })
 
 const updateVideo = asyncHandler(async (req, res) => {
@@ -256,6 +274,9 @@ const updateVideo = asyncHandler(async (req, res) => {
         video.description=description,
         video.thumbnail=thumbnailOnCloudinary.url
         await video.save()
+
+        // Invalidate cache
+        await redis.del(`video:${videoId}`)
 
         return res
         .status(200)
@@ -309,6 +330,9 @@ const deleteVideo = asyncHandler(async (req, res) => {
 
      // 4. Delete the video document from the database
      await video.deleteOne();  // .remove dont work with findOne it only works with findById 
+
+     // Invalidate cache
+     await redis.del(`video:${videoId}`)
 
      return res.status(200)
      .json(new apiResponse(
