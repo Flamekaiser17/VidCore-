@@ -4,8 +4,6 @@
 
 VidVore is a high-availability backend system designed for large-scale video-centric ecosystems. It implements enterprise-grade components including multi-token authentication, Redis-based transaction limiting, and asynchronous cloud media synchronization.
 
-![VidVore Application Interface](./docs/assets/vidvore_ui.png)
-
 ---
 
 ## Technical Architecture Overview
