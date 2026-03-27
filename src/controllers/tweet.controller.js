@@ -4,7 +4,6 @@ import {User} from "../models/user.models.js"
 import {apiError} from "../utils/apiError.js"
 import {apiResponse} from "../utils/apiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
-import { application } from "express"
 
 const createTweet = asyncHandler(async (req, res) => {
     //TODO: create tweet
@@ -50,8 +49,8 @@ const getUserTweets = asyncHandler(async (req, res) => {
         owner:userId
     })
 
-    if(!userTweets.length === 0){
-        throw new apiError(500,"No tweet found")
+    if(userTweets.length === 0){
+        throw new apiError(404,"No tweet found")
     }
 
     return res

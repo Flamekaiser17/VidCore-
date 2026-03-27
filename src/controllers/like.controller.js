@@ -119,15 +119,15 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
 
 const getLikedVideos = asyncHandler(async (req, res) => {
     //TODO: get all liked videos
-    const likedVideos = await Like.findOne({
+    const likedVideos = await Like.find({
         $and:[
             {likedBy:req.user?._id},
             {video:{$exists:true}}
         ]
     })
 
-    if(!likedVideos){
-        throw new apiError(400,"liked video not found")
+    if(!likedVideos.length){
+        throw new apiError(404,"No liked videos found")
     }
 
     return res

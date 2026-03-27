@@ -1,7 +1,7 @@
 import {asyncHandler} from "../utils/asyncHandler.js"
 import {apiError} from "../utils/apiError.js"
 import {User} from "../models/user.models.js"
-import {uploadOnCloudinary} from "../utils/cloudinary.js"
+import {uploadOnCloudinary, deleteFromCloudinary} from "../utils/cloudinary.js"
 import {apiResponse} from "../utils/apiResponse.js"
 import {verifyJWT} from "../middlewares/auth.middlewares.js"
 import jwt from "jsonwebtoken"
@@ -19,8 +19,7 @@ const generateAccessAndRefreshTokens = async(userId)=>{
         return {accessToken,refreshToken}
 
     } catch (error) {
-        throw new apiError(500,`Something want wrong while 
-            generating refresh and access tokens`)
+        throw new apiError(500,"Something went wrong while generating tokens")
     }
 }
 
@@ -289,15 +288,16 @@ const updateAccountDetails = asyncHandler(async(req,res)=>{
         throw new apiError(400,"All field are required")
     }
 
-    const user = await User.findByIdAndUpdate(req.user?._id,
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
         {
-            $set:{fullName,email},
-            new:true //update hone ke baad infoo return hoti hai
-        }
-     ).select("-password")
+            $set: { fullName, email }
+        },
+        { new: true }
+    ).select("-password")
 
      return res.status(200)
-     .json(new apiResponse(200,user," account details changed successfully "))
+     .json(new apiResponse(200, user, "Account details changed successfully"))
 })
 
 const updateUserAvatar = asyncHandler(async(req,res)=>{
@@ -307,23 +307,30 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
         throw new apiError(400,"Avatar file is missing")
     }
 
-    const avatar = await uploadOnCloudinary(avatarLocalPath,"myTube/avatar")
+    const oldAvatarUrl = req.user?.avatar;
+
+    const avatar = await uploadOnCloudinary(avatarLocalPath, "myTube/avatar")
 
     if(!avatar){
-        throw new apiError(400,"error while uploadig file to cloudinary")
+        throw new apiError(400, "Error while uploading avatar to Cloudinary")
     }
 
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
-            $set:{avatar:avatar.url},
-            new:true
-        }
+            $set: { avatar: avatar.url }
+        },
+        { new: true }
     ).select("-password")
+
+    // Delete old avatar from Cloudinary
+    if (oldAvatarUrl) {
+        await deleteFromCloudinary(oldAvatarUrl, "image")
+    }
 
     return res.status(200)
     .json(
-        new apiResponse(200,user,"avatar changed successfully")
+        new apiResponse(200, user, "Avatar changed successfully")
     )
 })
 
@@ -334,23 +341,30 @@ const updateUserCoverImage = asyncHandler(async(req,res)=>{
         throw new apiError(400,"cover image file is missing")
     }
 
-    const coverImage = await uploadOnCloudinary(avatarLocalPath,"myTube/coverImage")
+    const oldCoverImageUrl = req.user?.coverImage;
+
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath, "myTube/coverImage")
 
     if(!coverImage){
-        throw new apiError(400,"error while uploadig file to cloudinary")
+        throw new apiError(400, "Error while uploading cover image to Cloudinary")
     }
 
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
-            $set:{coverImage:coverImage.url},
-            new:true
-        }
+            $set: { coverImage: coverImage.url }
+        },
+        { new: true }
     ).select("-password")
-    
+
+    // Delete old cover image from Cloudinary
+    if (oldCoverImageUrl) {
+        await deleteFromCloudinary(oldCoverImageUrl, "image")
+    }
+
     return res.status(200)
     .json(
-        new apiResponse(200,user,"cover image changed successfully")
+        new apiResponse(200, user, "Cover image changed successfully")
     )
 })
 

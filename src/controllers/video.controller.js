@@ -141,8 +141,8 @@ const publishAVideo = asyncHandler(async (req, res) => {
         }
 
         // 2. upload video and thumbnail
-        const videoLocalPath = req.files?.videoFile[0]?.path
-        const thumbnailLocalPath = req.files?.thumbnail[0]?.path
+        const videoLocalPath = req.files?.videoFile?.[0]?.path
+        const thumbnailLocalPath = req.files?.thumbnail?.[0]?.path
 
         if ( !videoLocalPath ) { throw new apiError( 400, "Please upload video" ) }
         if ( !thumbnailLocalPath ) { throw new apiError( 400, "Please upload thumbnail" ) }
@@ -249,7 +249,7 @@ const updateVideo = asyncHandler(async (req, res) => {
 
         //delete
         const thumbnailOldUrl = video?.thumbnail
-        const deleteThumbnail =await deleteFromCloudinary(thumbnailOldUrl,"myTube/thumbnail")
+        const deleteThumbnail = await deleteFromCloudinary(thumbnailOldUrl, "image")
         if(!deleteThumbnail){throw new apiError(400,"thumbnail not deleted")}
 
         video.title=title,
@@ -300,8 +300,8 @@ const deleteVideo = asyncHandler(async (req, res) => {
         throw new apiError(400,"user not allowed to delete")
     }
 
-    const videoFile = await deleteFromCloudinary(video.videoFile,"myTube/video")
-    const thumbnailFile = await deleteFromCloudinary(video.thumbnail,"myTube/thumbnail")
+    const videoFile = await deleteFromCloudinary(video.videoFile, "video")
+    const thumbnailFile = await deleteFromCloudinary(video.thumbnail, "image")
 
     if(!videoFile && !thumbnailFile){
         throw new apiError(400,"thumbnail or videoFile is not deleted from cloudinary")

@@ -9,7 +9,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
     const {videoId} = req.params
     const {page = 1, limit = 10} = req.query
     if(!isValidObjectId(videoId)){
-        throw new apiError(500,"invalid videoId")
+        throw new apiError(400,"invalid videoId or commentId")
     }
 
     let pipeline = [
@@ -30,7 +30,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
 
     }
 
-    const allComments = await Comment.aggregatePaginate(pipeline,options)
+    const allComments = await Comment.aggregatePaginate(Comment.aggregate(pipeline), options)
 
     if(allComments?.total_coments === 0){
         throw new apiError(400,"comment not found")
@@ -58,7 +58,7 @@ const addComment = asyncHandler(async (req, res) => {
     const {content}= req.body
 
     if(!isValidObjectId(videoId)){
-        throw new apiError(500,"invalid videoId")
+        throw new apiError(400,"invalid videoId or commentId")
     }
 
     if(!content){
@@ -94,7 +94,7 @@ const updateComment = asyncHandler(async (req, res) => {
     const {content}= req.body
 
     if(!isValidObjectId(commentId)){
-        throw new apiError(500,"invalid videoId")
+        throw new apiError(400,"invalid videoId or commentId")
     }
 
     if(!content){
@@ -131,7 +131,7 @@ const deleteComment = asyncHandler(async (req, res) => {
   
 
     if(!isValidObjectId(commentId)){
-        throw new apiError(500,"invalid videoId")
+        throw new apiError(400,"invalid videoId or commentId")
     }
 
     const deletecomment = await Comment.deleteOne({

@@ -29,7 +29,7 @@ const getChannelStats = asyncHandler(async (req, res) => {
       }
 
     //get the channelID
-    const channelId = await new  mongoose.Types.ObjectId(channel?._id)
+    const channelId = new mongoose.Types.ObjectId(channel?._id)
 
     if(!isValidObjectId(channelId)){
         throw new apiError(400,"non valid channel id")
@@ -38,22 +38,13 @@ const getChannelStats = asyncHandler(async (req, res) => {
     const totalViewsAndVideos = await Video.aggregate([
         {
             $match:{
-                //$match removes all other videos and keeps only the ones that meet your criteria.
-                $and:[
-                    //The $and operator in MongoDB is used to combine multiple conditions in a query. It ensures that all the conditions specified must be true for a document to be included in the results.
-                    {
-                        owner: new mongoose.Types.ObjectId(channelId)
-                    },
-                    {
-                        isPublished:true
-                    }
-                ]
+                owner: new mongoose.Types.ObjectId(channelId),
+                isPublished: true
             }
         },
-        //$group can count how many videos there are and add up all the views for those videos.
         {
             $group:{
-                _id:"$owner",
+                _id: null,
                 totalViews:{
                     $sum:"$views"
                 },
@@ -103,17 +94,8 @@ const getChannelStats = asyncHandler(async (req, res) => {
     const totalVideoLikes = await Like.aggregate([
         {
             $match:{
-                $and:[
-                    {
-                        likedBy:new mongoose.Types.ObjectId(channelId)
-                    },
-                    {
-                        video:
-                        {
-                            $exists:true
-                        }
-                    }
-                ]
+                likedBy:new mongoose.Types.ObjectId(channelId),
+                video: { $exists:true }
             }
         },
         {
@@ -124,17 +106,8 @@ const getChannelStats = asyncHandler(async (req, res) => {
     const totalCommentLikes = await Like.aggregate([
         {
             $match:{
-                $and:[
-                    {
-                        likedBy:new mongoose.Types.ObjectId(channelId)
-                    },
-                    {
-                        comment:
-                        {
-                            $exists:true
-                        }
-                    }
-                ]
+                likedBy:new mongoose.Types.ObjectId(channelId),
+                comment: { $exists:true }
             }
         },
         {
@@ -145,22 +118,12 @@ const getChannelStats = asyncHandler(async (req, res) => {
     const totalTweetLikes  = await Like.aggregate([
         {
             $match:{
-                $and:[
-                    {
-                        likedBy:new mongoose.Types.ObjectId(channelId)
-                    },
-                    {
-                        tweet:
-                        {
-                            $exists:true
-                        }
-                    }
-                ]
+                likedBy:new mongoose.Types.ObjectId(channelId),
+                tweet: { $exists:true }
             }
         },
         {
             $count:"totalTweetsLiked"
-            
         }
     ])
 
@@ -169,14 +132,14 @@ const getChannelStats = asyncHandler(async (req, res) => {
     .json(
         new apiResponse(200,
             {
-                "totalViews": totalViewsAndVideos[0]?.totalViews,
-                "totalVideos": totalViewsAndVideos[0]?.totalVideos,
-                "totalSubs": totalSubscribers[0]?.totalSubscribers,
-                "totalTweets": totalTweets[0]?.totalTweets,
-                "totalComments": totalComments[0]?.totalComments,
-                "totalVideoLikes": totalVideoLikes[0]?.totalVideosLiked,
-                "totalCommentLikes": totalCommentLikes[0]?.totalCommentsLiked,
-                "totalTweetLikes": totalTweetLikes[0]?.totalTweetsLiked
+                "totalViews": totalViewsAndVideos[0]?.totalViews || 0,
+                "totalVideos": totalViewsAndVideos[0]?.totalVideos || 0,
+                "totalSubs": totalSubscribers[0]?.totalSubscribers || 0,
+                "totalTweets": totalTweets[0]?.totalTweets || 0,
+                "totalComments": totalComments[0]?.totalComments || 0,
+                "totalVideoLikes": totalVideoLikes[0]?.totalVideosLiked || 0,
+                "totalCommentLikes": totalCommentLikes[0]?.totalCommentsLiked || 0,
+                "totalTweetLikes": totalTweetLikes[0]?.totalTweetsLiked || 0
             }, "Stats of the channel fetched successfully"
         )
     )

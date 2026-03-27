@@ -8,8 +8,8 @@ import {asyncHandler} from "../utils/asyncHandler.js"
 const createPlaylist = asyncHandler(async (req, res) => {
     const {name, description} = req.body
     //TODO: create playlist
-    if(!name && !description){
-        throw new apiError(400,"please enter the naem and description ")
+    if(!name || !description){
+        throw new apiError(400,"please enter the name and description")
     }
 
     const createPlaylist = await Playlist.create({
@@ -65,7 +65,7 @@ const getPlaylistById = asyncHandler(async (req, res) => {
     const {playlistId} = req.params
     //TODO: get playlist by id
     if(!isValidObjectId(playlistId)){
-        throw apiError(400,"invalid playlist")
+        throw new apiError(400,"invalid playlist")
     }
 
     const findPlaylist = await Playlist.findById(playlistId)
@@ -112,8 +112,8 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
         throw new apiError(400,"video is already added to playlist")
     }
 
-    if (!findPlaylistId.video) {
-        findPlaylistId.video = [];
+    if (!findPlaylistId.videos) {
+        findPlaylistId.videos = [];
     }
 
     findPlaylistId.videos.push(videoId)
@@ -225,8 +225,8 @@ const updatePlaylist = asyncHandler(async (req, res) => {
         throw new apiError(400,"invlalid playlistId")
     }
 
-    if(!name && !description){
-        throw new apiError(400,"please enter the naem and description ")
+    if(!name || !description){
+        throw new apiError(400,"please enter the name and description")
     }
 
     const findPlaylistId = await Playlist.findById(playlistId)
@@ -242,7 +242,7 @@ const updatePlaylist = asyncHandler(async (req, res) => {
     findPlaylistId.name = name,
     findPlaylistId.description= description
 
-    const updatePlaylist = findPlaylistId.save()
+    const updatePlaylist = await findPlaylistId.save()
     if(!updatePlaylist){
         throw new apiError(400,"playlist was not updated")
     }
