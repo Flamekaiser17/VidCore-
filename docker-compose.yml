@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   # The VidVore Node.js application
-  app:
+  chalwao:
     build: .
     ports:
       - "3000:3000"

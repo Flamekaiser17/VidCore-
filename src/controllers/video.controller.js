@@ -136,9 +136,11 @@ const publishAVideo = asyncHandler(async (req, res) => {
     // TODO: get video, upload to cloudinary, create video
     try {
         // 1. Get the video file and thumbnail from the request body(frontend)
-        const { title, description} = req.body
-        if([title,description].some((field)=>field.trim() === "")){
-            throw new apiError(400,"please provider all given details")
+        console.log("DEBUG: req.body =", req.body);
+        console.log("DEBUG: req.files =", req.files);
+        const { title, description } = req.body;
+        if (!title || !description || title.trim() === "" || description.trim() === "") {
+            throw new apiError(400, "title and description are required");
         }
 
         // 2. upload video and thumbnail
@@ -179,8 +181,9 @@ const publishAVideo = asyncHandler(async (req, res) => {
             )
         )
 } catch (error) {
+        console.error("UPLOAD ERROR:", error);
         return res.status(501)
-        .json(  new apiResponse(501,{},"Problem in uplaoding video"))
+            .json(new apiResponse(501, { error: error.message }, "Problem in uploading video"));
     }
 
 })
@@ -204,8 +207,9 @@ const getVideoById = asyncHandler(async (req, res) => {
         
         if (cachedVideo) {
             console.log("⚡ Serving from Cache");
+            const data = typeof cachedVideo === 'string' ? JSON.parse(cachedVideo) : cachedVideo;
             return res.status(200).json(
-                new apiResponse(200, JSON.parse(cachedVideo), "video fetched successfully (from cache)")
+                new apiResponse(200, data, "video fetched successfully (from cache)")
             );
         }
 
@@ -218,7 +222,7 @@ const getVideoById = asyncHandler(async (req, res) => {
         }
 
         // Step 3: Store in Redis for 5 minutes (300 seconds)
-        await redis.set(cacheKey, JSON.stringify(video), "EX", 300);
+        await redis.set(cacheKey, JSON.stringify(video), { ex: 300 });
 
         return res.status(200)
             .json(

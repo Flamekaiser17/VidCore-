@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import connectDB from "./db/index.js";
 import {app} from "./app.js"
+import Redis from "ioredis";
 
 dotenv.config({
     path: './.env'
@@ -16,8 +17,14 @@ connectDB()
 
     const port = process.env.PORT || 8000;
     app.listen(port, () => {
-        console.log(`🚀 Server is running at the port : ${port}`);
+        console.log(`vidvore app running on port ${port}`);
     })
+
+    // Redis connection for requested log
+    const redis = new Redis(process.env.UPSTASH_REDIS_URL);
+    redis.on("connect", () => {
+        console.log("Redis ready");
+    });
 })
 .catch((error)=>{
     console.log("MongoDB connection Failed!!",error);

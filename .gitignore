@@ -2,6 +2,7 @@ node_modules/
 .env
 .DS_Store
 public/temp/*
+!public/temp/.gitkeep
 *.log
 npm-debug.log*
 yarn-debug.log*

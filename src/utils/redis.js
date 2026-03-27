@@ -1,15 +1,11 @@
-import Redis from "ioredis"
+import { Redis } from "@upstash/redis"
 
-// Redis connection - using environment variable for the full URL
-// Example: redis://default:token@host:port
-const redis = new Redis(process.env.UPSTASH_REDIS_URL)
-
-redis.on("connect", () => {
-    console.log("🚀 Redis connected successfully!")
+// Upstash Redis connection using REST credentials
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
 })
 
-redis.on("error", (err) => {
-    console.log("❌ Redis connection failed:", err)
-})
+console.log("🚀 Upstash Redis (REST) client initialized");
 
 export { redis }
