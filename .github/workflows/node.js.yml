@@ -10,6 +10,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # Setup temporary MongoDB and Redis for CI tests
+    services:
+      mongodb:
+        image: mongo:latest
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+
     strategy:
       matrix:
         node-version: [18.x, 20.x]
@@ -21,5 +32,16 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-    - run: npm install
-    - run: npm test
+    
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run Connectivity Tests
+      # Set dummy environment variables for CI environment
+      env:
+        PORT: 3000
+        MONGODB_URL: mongodb://localhost:27017
+        UPSTASH_REDIS_URL: redis://localhost:6379
+        ACCESS_TOKEN_SECRET: test_secret
+        REFRESH_TOKEN_SECRET: test_secret_refresh
+      run: npm test
