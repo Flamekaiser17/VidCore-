@@ -2,9 +2,9 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
@@ -26,22 +26,22 @@ jobs:
         node-version: [18.x, 20.x]
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm install
+      - uses: actions/checkout@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
 
-    - name: Run Connectivity Tests
-      # Set dummy environment variables for CI environment
-      env:
-        PORT: 3000
-        MONGODB_URL: mongodb://localhost:27017
-        UPSTASH_REDIS_URL: redis://localhost:6379
-        ACCESS_TOKEN_SECRET: test_secret
-        REFRESH_TOKEN_SECRET: test_secret_refresh
-      run: npm test
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Connectivity Tests
+        # Set dummy environment variables for CI environment
+        env:
+          PORT: 3000
+          MONGODB_URL: mongodb://localhost:27017
+          UPSTASH_REDIS_URL: redis://localhost:6379
+          ACCESS_TOKEN_SECRET: test_secret
+          REFRESH_TOKEN_SECRET: test_secret_refresh
+        run: npm test

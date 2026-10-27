@@ -12,13 +12,16 @@ const asyncHandler = (requestHandler) => {
 
 export { asyncHandler };
 
-// const asyncHandler = (func)=>async(req,res,next)=>{
-//     try {
-//         await func(req,res,next)
-//     } catch (error) {
-//         res.status(error.code || 500).json({
-//             success:false,
-//             message:error.message
-//         })
-//     }
-// }
+// const asyncHandler = (func) => async (req, res, next) => {
+//   try {
+//     await func(req, res, next);
+//   } catch (error) {
+//     const statusCode = error.statusCode || 500;
+//     res.status(statusCode).json({
+//       success: false,
+//       statusCode,
+//       message: error.message || "Something went wrong",
+//       errors: error.errors || [],
+//     });
+//   }
+// };
