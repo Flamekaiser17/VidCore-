@@ -124,6 +124,34 @@ VidVore is a high-throughput, distributed backend engineered for asynchronous me
             success: { type: "boolean" },
           },
         },
+        TranscriptSegment: {
+          type: "object",
+          required: ["start", "end", "text"],
+          properties: {
+            start: { type: "number", description: "Start offset in seconds" },
+            end: { type: "number", description: "End offset in seconds" },
+            text: { type: "string" },
+          },
+        },
+        Transcript: {
+          type: "object",
+          properties: {
+            _id: { type: "string" },
+            video: { type: "string" },
+            rawText: { type: "string" },
+            segments: {
+              type: "array",
+              items: { $ref: "#/components/schemas/TranscriptSegment" },
+            },
+            status: {
+              type: "string",
+              enum: ["processing", "ready", "failed"],
+            },
+            error: { type: "string", nullable: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
       },
     },
     security: [{ bearerAuth: [] }],
@@ -142,6 +170,11 @@ VidVore is a high-throughput, distributed backend engineered for asynchronous me
         name: "🎬 Video Processing Pipeline",
         description:
           "Non-blocking upload, BullMQ worker queue, and HLS streaming",
+      },
+      {
+        name: "AI Intelligence",
+        description:
+          "Timestamped video transcripts and transcript-grounded question answering",
       },
       { name: "🐦 Tweets", description: "Short-form community posts" },
       { name: "💬 Comments", description: "Video comment threading" },
@@ -517,6 +550,197 @@ VidVore is a high-throughput, distributed backend engineered for asynchronous me
             },
           },
           responses: { 200: { description: "Video updated ✅" } },
+        },
+      },
+      "/videos/{videoId}/ask": {
+        post: {
+          tags: ["AI Intelligence"],
+          summary: "Ask questions against video transcript via semantic RAG",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "videoId",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["question"],
+                  properties: {
+                    question: {
+                      type: "string",
+                      example:
+                        "Where does the speaker explain distributed locking?",
+                    },
+                    clearHistory: {
+                      type: "boolean",
+                      default: false,
+                      description:
+                        "Optionally reset multi-turn conversation memory for this video",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "AI query executed successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      statusCode: { type: "integer", example: 200 },
+                      data: {
+                        type: "object",
+                        required: ["videoId", "question", "answer"],
+                        properties: {
+                          videoId: { type: "string" },
+                          question: { type: "string" },
+                          answer: { type: "string" },
+                          citations: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                chunkIndex: { type: "number" },
+                                startTime: { type: "number" },
+                                endTime: { type: "number" },
+                                formattedStartTime: { type: "string" },
+                                formattedEndTime: { type: "string" },
+                                score: { type: "number" },
+                                text: { type: "string" },
+                              },
+                            },
+                          },
+                          isCached: {
+                            type: "boolean",
+                            example: false,
+                          },
+                        },
+                      },
+                      message: {
+                        type: "string",
+                        example: "AI query executed successfully",
+                      },
+                      success: { type: "boolean", example: true },
+                    },
+                  },
+                },
+              },
+            },
+            400: { description: "Missing question" },
+            404: { description: "Video or transcript not found" },
+            409: { description: "Transcript is still processing" },
+            500: { description: "Transcription failure or server error" },
+          },
+        },
+      },
+      "/videos/{videoId}/ask/stream": {
+        post: {
+          tags: ["AI Intelligence"],
+          summary:
+            "Real-time Server-Sent Events (SSE) token streaming for video QA with abort handling",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "videoId",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["question"],
+                  properties: {
+                    question: {
+                      type: "string",
+                      example:
+                        "Summarize the key takeaways and citations from this video.",
+                    },
+                    clearHistory: {
+                      type: "boolean",
+                      default: false,
+                      description:
+                        "Optionally reset multi-turn conversation memory for this video",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description:
+                "Server-Sent Events (SSE) token stream (`text/event-stream`)",
+              content: {
+                "text/event-stream": {
+                  schema: {
+                    type: "string",
+                    example:
+                      'data: {"type":"citations","citations":[...],"isCached":false}\n\ndata: {"type":"token","text":"Hello"}\n\ndata: [DONE]\n\n',
+                  },
+                },
+              },
+            },
+            400: {
+              description: "Invalid question bounds (3-500 chars) or videoId",
+            },
+            404: { description: "Video or transcript not found" },
+            409: { description: "Transcript is still processing" },
+            500: {
+              description: "Transcription failure or server streaming error",
+            },
+          },
+        },
+      },
+      "/videos/{videoId}/transcript": {
+        get: {
+          tags: ["AI Intelligence"],
+          summary: "Retrieve timestamped transcript segments for a video",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "videoId",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            200: {
+              description: "Transcript fetched successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      statusCode: { type: "integer", example: 200 },
+                      data: { $ref: "#/components/schemas/Transcript" },
+                      message: {
+                        type: "string",
+                        example: "Transcript fetched successfully",
+                      },
+                      success: { type: "boolean", example: true },
+                    },
+                  },
+                },
+              },
+            },
+            404: { description: "Transcript not found" },
+          },
         },
       },
       "/videos/toggle/publish/{videoId}": {

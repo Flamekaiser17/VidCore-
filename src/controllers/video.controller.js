@@ -1,5 +1,7 @@
 import mongoose, { isValidObjectId } from "mongoose";
+import crypto from "crypto";
 import { Video } from "../models/video.model.js";
+import { Transcript } from "../models/transcript.model.js";
 import { User } from "../models/user.models.js";
 import { apiError } from "../utils/apiError.js";
 import { apiResponse } from "../utils/apiResponse.js";
@@ -10,6 +12,13 @@ import {
 } from "../utils/cloudinary.js";
 import { redis } from "../redis/index.js"; // unified ioredis client
 import { videoTranscodeQueue } from "../queues/video.queue.js"; // BullMQ queue
+import { answerVideoQuestion } from "../services/ai.service.js";
+import {
+  askVideoWithMemory,
+  clearSessionHistory,
+  getSessionHistoryHash,
+  streamVideoWithMemory,
+} from "../services/videoChat.service.js";
 
 ////////// Get all videos //////////
 // 1. Get the page, limit, query, sortBy, sortType, userId from the request query(frontend) [http://localhost:8000/api/v1/video/all-video?page=1&limit=10&query=hello&sortBy=createdAt&sortType=1&userId=123]
@@ -409,6 +418,305 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     );
 });
 
+const askVideoQuery = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  const question =
+    typeof req.body?.question === "string" ? req.body.question.trim() : "";
+  const clearHistory = req.body?.clearHistory === true;
+  const userId = req.user?._id?.toString() || "anonymous";
+  const sessionId = `${userId}:${videoId}`;
+
+  if (clearHistory) {
+    await clearSessionHistory(sessionId);
+  }
+
+  if (!question || question.length < 3 || question.length > 500) {
+    throw new apiError(400, "Question must be between 3 and 500 characters.");
+  }
+  if (!isValidObjectId(videoId)) {
+    throw new apiError(400, "Enter a valid videoId");
+  }
+
+  const normalizedQuery = question.trim().toLowerCase();
+  const queryHash = crypto
+    .createHash("sha256")
+    .update(normalizedQuery)
+    .digest("hex");
+
+  // Multi-Turn Context-Aware Query Caching:
+  // If Turn 1 / clearHistory: global video QA cache.
+  // If Follow-up Turn: incorporate hash of the prior session message into cacheKey.
+  let cacheKey = `cache:video:${videoId}:qa:${queryHash}`;
+  if (!clearHistory) {
+    const historyContextHash = await getSessionHistoryHash(sessionId);
+    if (historyContextHash) {
+      cacheKey = `cache:video:${videoId}:qa:${historyContextHash}:${queryHash}`;
+    }
+  }
+
+  if (!clearHistory) {
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      res.setHeader("X-Cache", "HIT");
+      let parsed = cachedData;
+      try {
+        parsed = JSON.parse(cachedData);
+      } catch {
+        parsed = { answer: cachedData, citations: [] };
+      }
+
+      return res.status(200).json(
+        new apiResponse(
+          200,
+          {
+            videoId,
+            question,
+            answer: parsed.answer || parsed,
+            citations: parsed.citations || [],
+            isCached: true,
+          },
+          "AI query executed successfully"
+        )
+      );
+    }
+  }
+
+  const transcript = await Transcript.findOne({ video: videoId });
+  if (!transcript) {
+    throw new apiError(404, "Transcript not found for this video");
+  }
+  if (transcript.status === "processing") {
+    throw new apiError(
+      409,
+      "Video transcript is currently being processed. Please retry shortly."
+    );
+  }
+  if (transcript.status === "failed") {
+    throw new apiError(
+      500,
+      `Transcript processing failed: ${transcript.error || transcript.errorMessage}`
+    );
+  }
+
+  let answer = "";
+  let citations = [];
+
+  if (Array.isArray(transcript.chunks) && transcript.chunks.length > 0) {
+    // Phase 2: RAG with Top-K semantic retrieval & LangChain conversational memory
+    const result = await askVideoWithMemory({
+      videoId,
+      userId,
+      question,
+      chunks: transcript.chunks,
+    });
+    answer = result.answer;
+    citations = result.citations || [];
+  } else if (
+    Array.isArray(transcript.segments) &&
+    transcript.segments.length > 0
+  ) {
+    // Graceful fallback to segment prompt if chunks have not yet been indexed
+    const promptWrappedQuestion = `<user_question>${question}</user_question>`;
+    answer = await answerVideoQuestion(
+      promptWrappedQuestion,
+      transcript.segments
+    );
+  } else {
+    throw new apiError(
+      422,
+      "Video transcript has no indexed chunks or segments for analysis."
+    );
+  }
+
+  await redis.set(cacheKey, JSON.stringify({ answer, citations }), "EX", 3600);
+
+  res.setHeader("X-Cache", "MISS");
+  return res.status(200).json(
+    new apiResponse(
+      200,
+      {
+        videoId,
+        question,
+        answer,
+        citations,
+        isCached: false,
+      },
+      "AI query executed successfully"
+    )
+  );
+});
+
+const askVideoQueryStream = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  const question =
+    typeof req.body?.question === "string" ? req.body.question.trim() : "";
+  const clearHistory = req.body?.clearHistory === true;
+  const userId = req.user?._id?.toString() || "anonymous";
+  const sessionId = `${userId}:${videoId}`;
+
+  if (clearHistory) {
+    await clearSessionHistory(sessionId);
+  }
+
+  if (!question || question.length < 3 || question.length > 500) {
+    throw new apiError(400, "Question must be between 3 and 500 characters.");
+  }
+  if (!isValidObjectId(videoId)) {
+    throw new apiError(400, "Enter a valid videoId");
+  }
+
+  const normalizedQuery = question.trim().toLowerCase();
+  const queryHash = crypto
+    .createHash("sha256")
+    .update(normalizedQuery)
+    .digest("hex");
+
+  // Determine context-aware cache key
+  let cacheKey = `cache:video:${videoId}:qa:${queryHash}`;
+  if (!clearHistory) {
+    const historyContextHash = await getSessionHistoryHash(sessionId);
+    if (historyContextHash) {
+      cacheKey = `cache:video:${videoId}:qa:${historyContextHash}:${queryHash}`;
+    }
+  }
+
+  // Fast-path: Check Redis cache
+  if (!clearHistory) {
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      let parsed;
+      try {
+        parsed = JSON.parse(cachedData);
+      } catch {
+        parsed = { answer: cachedData, citations: [] };
+      }
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.setHeader("X-Cache", "HIT");
+
+      res.write(
+        `data: ${JSON.stringify({
+          type: "citations",
+          citations: parsed.citations || [],
+          isCached: true,
+        })}\n\n`
+      );
+      res.write(
+        `data: ${JSON.stringify({
+          type: "token",
+          text: parsed.answer || parsed,
+        })}\n\n`
+      );
+      res.write("data: [DONE]\n\n");
+      return res.end();
+    }
+  }
+
+  // Verify transcript readiness before flushing SSE headers
+  const transcript = await Transcript.findOne({ video: videoId });
+  if (!transcript) {
+    throw new apiError(404, "Transcript not found for this video");
+  }
+  if (transcript.status === "processing") {
+    throw new apiError(
+      409,
+      "Video transcript is currently being processed. Please retry shortly."
+    );
+  }
+  if (transcript.status === "failed") {
+    throw new apiError(
+      500,
+      `Transcript processing failed: ${transcript.error || transcript.errorMessage}`
+    );
+  }
+
+  // Set SSE Headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.setHeader("X-Cache", "MISS");
+
+  const abortController = new AbortController();
+  req.on("close", () => {
+    abortController.abort();
+  });
+
+  try {
+    const { citations, streamGenerator } = await streamVideoWithMemory({
+      videoId,
+      userId,
+      question,
+      chunks: transcript.chunks,
+      segments: transcript.segments,
+      signal: abortController.signal,
+    });
+
+    res.write(
+      `data: ${JSON.stringify({
+        type: "citations",
+        citations,
+        isCached: false,
+      })}\n\n`
+    );
+
+    let fullText = "";
+    for await (const tokenChunk of streamGenerator) {
+      if (abortController.signal.aborted) {
+        break;
+      }
+      fullText += tokenChunk;
+      res.write(
+        `data: ${JSON.stringify({ type: "token", text: tokenChunk })}\n\n`
+      );
+    }
+
+    if (!abortController.signal.aborted) {
+      if (fullText.trim()) {
+        await redis.set(
+          cacheKey,
+          JSON.stringify({ answer: fullText, citations }),
+          "EX",
+          3600
+        );
+      }
+      res.write("data: [DONE]\n\n");
+    }
+
+    return res.end();
+  } catch (err) {
+    if (!abortController.signal.aborted) {
+      res.write(
+        `data: ${JSON.stringify({
+          type: "error",
+          message: err.message || "An error occurred during streaming",
+        })}\n\n`
+      );
+    }
+    return res.end();
+  }
+});
+
+const getVideoTranscript = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+
+  if (!isValidObjectId(videoId)) {
+    throw new apiError(400, "Enter a valid videoId");
+  }
+
+  const transcript = await Transcript.findOne({ video: videoId });
+  if (!transcript) {
+    throw new apiError(404, "Transcript not found for this video");
+  }
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, transcript, "Transcript fetched successfully"));
+});
+
 export {
   getAllVideos,
   publishAVideo,
@@ -416,4 +724,7 @@ export {
   updateVideo,
   deleteVideo,
   togglePublishStatus,
+  askVideoQuery,
+  askVideoQueryStream,
+  getVideoTranscript,
 };

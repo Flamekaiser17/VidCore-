@@ -11,7 +11,7 @@
  *   3. Updates the MongoDB Video document with the result (status, hlsUrl, duration)
  *   4. Cleans up the temp raw file saved by Multer in public/temp/
  */
-
+import "dotenv/config";
 import { Worker } from "bullmq";
 import { createRequire } from "module";
 import { promises as fs } from "fs";
@@ -20,7 +20,10 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import connectDB from "../db/index.js";
 import { Video } from "../models/video.model.js";
+import { Transcript } from "../models/transcript.model.js";
 import { redisConnectionOptions } from "../redis/index.js";
+import { transcribeAudioFile } from "../services/ai.service.js";
+import { generateEmbeddings } from "../services/embedding.service.js";
 
 // Load .env (worker runs as a standalone process separate from the API server)
 dotenv.config({ path: "./.env" });
@@ -99,6 +102,68 @@ const transcodeToHLS = (inputPath, outputPath) =>
       .run();
   });
 
+const extractAudio = (inputPath, outputPath) =>
+  new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .noVideo()
+      .audioCodec("libmp3lame")
+      .audioBitrate(48)
+      .on("end", () => resolve(outputPath))
+      .on("error", (err) => reject(err))
+      .save(outputPath);
+  });
+
+/**
+ * Group Whisper segments into 35-45 second temporal windows (or end of transcript)
+ * to keep coherent context while preserving exact startTime and endTime.
+ *
+ * @param {Array<{start: number, end: number, text: string}>} segments
+ * @param {number} [targetWindowSeconds=40]
+ * @returns {Array<{chunkIndex: number, startTime: number, endTime: number, text: string}>}
+ */
+export const buildTranscriptChunks = (segments, targetWindowSeconds = 40) => {
+  if (!Array.isArray(segments) || segments.length === 0) {
+    return [];
+  }
+
+  const chunks = [];
+  let currentGroup = [];
+  let chunkStartTime = null;
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    if (chunkStartTime === null) {
+      chunkStartTime = seg.start;
+    }
+
+    currentGroup.push(seg);
+    const currentDuration = seg.end - chunkStartTime;
+    const isLastSegment = i === segments.length - 1;
+
+    // Trigger chunk creation when window duration is in the 35-45s window (>= 35s) or at the end
+    if (currentDuration >= 35 || isLastSegment) {
+      const text = currentGroup
+        .map((s) => s.text.trim())
+        .filter(Boolean)
+        .join(" ");
+
+      if (text) {
+        chunks.push({
+          chunkIndex: chunks.length,
+          startTime: chunkStartTime,
+          endTime: seg.end,
+          text,
+        });
+      }
+
+      currentGroup = [];
+      chunkStartTime = null;
+    }
+  }
+
+  return chunks;
+};
+
 // ─────────────────────────────────────────────
 // BullMQ Worker
 // ─────────────────────────────────────────────
@@ -134,7 +199,95 @@ const worker = new Worker(
       });
       console.log(`💾 MongoDB updated → status: ready`);
 
-      // 5. Delete the original temp raw file (saved by Multer in public/temp/)
+      // Transcription is independent of streaming readiness.
+      const tempAudioPath = path.join("public", "temp", `audio-${videoId}.mp3`);
+      try {
+        await extractAudio(videoLocalPath, tempAudioPath);
+
+        await Transcript.findOneAndUpdate(
+          { video: videoId },
+          {
+            status: "processing",
+            rawText: "Pending transcription...",
+            segments: [],
+            chunks: [],
+            error: null,
+            errorMessage: null,
+          },
+          { upsert: true, new: true }
+        );
+
+        const { rawText, segments } = await transcribeAudioFile(tempAudioPath);
+
+        const chunks = buildTranscriptChunks(segments);
+        let enrichedChunks = [];
+
+        if (chunks.length > 0) {
+          const chunkTexts = chunks.map((c) => c.text);
+          const embeddings = await generateEmbeddings(chunkTexts);
+          enrichedChunks = chunks.map((chunk, idx) => ({
+            ...chunk,
+            embedding: embeddings[idx] || [],
+          }));
+        }
+
+        await Transcript.findOneAndUpdate(
+          { video: videoId },
+          {
+            status: "completed",
+            rawText,
+            segments,
+            chunks: enrichedChunks,
+            error: null,
+            errorMessage: null,
+          },
+          { upsert: true, new: true }
+        );
+        console.log(
+          `🧠 AI transcription & semantic chunking complete for video ${videoId} (${enrichedChunks.length} chunks generated)`
+        );
+      } catch (aiErr) {
+        console.error(
+          `AI transcription failed for video ${videoId}:`,
+          aiErr.message
+        );
+        try {
+          await Transcript.findOneAndUpdate(
+            { video: videoId },
+            {
+              $set: {
+                status: "failed",
+                error: aiErr.message,
+                errorMessage: aiErr.message,
+              },
+              $setOnInsert: {
+                rawText: "Transcription unavailable",
+                segments: [],
+                chunks: [],
+              },
+            },
+            { upsert: true }
+          );
+        } catch (transcriptErr) {
+          console.error(
+            `Failed to record transcription error for video ${videoId}:`,
+            transcriptErr.message
+          );
+        }
+      } finally {
+        try {
+          await fs.unlink(tempAudioPath);
+        } catch (audioUnlinkErr) {
+          if (audioUnlinkErr.code !== "ENOENT") {
+            console.warn(
+              `Could not delete temporary audio file ${tempAudioPath}:`,
+              audioUnlinkErr.message
+            );
+          }
+        }
+      }
+
+      // Delete the original temp raw file (saved by Multer in public/temp/)
       try {
         await fs.unlink(videoLocalPath);
         console.log(`🗑️  Temp file deleted: ${videoLocalPath}`);
